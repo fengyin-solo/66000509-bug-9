@@ -58,9 +58,14 @@ const form = reactive({
 })
 
 const animStep = ref(0)
-const maxStep = computed(() => Math.max(0, (store.result?.path.length || 1) - 1))
+const maxStep = computed(() => store.maxStep)
 
 watch(() => store.animationStep, (v) => { animStep.value = v })
+
+// 切换算法/测试函数：动画状态复位，按同一口径重新计算
+watch(() => [form.algorithm, form.functionId], () => {
+  if (store.result) run()
+})
 
 function run() { store.runOptimization({ ...form } as any) }
 function onSlider(v: number) { store.setStep(v); store.pauseAnimation() }

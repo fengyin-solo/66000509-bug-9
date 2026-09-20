@@ -13,22 +13,25 @@ import { useOptimizationStore } from '../store/optimization'
 const store = useOptimizationStore()
 const chart = ref<HTMLDivElement>()
 let instance: echarts.ECharts | null = null
+const onResize = () => instance?.resize()
 
 function initChart() {
   if (!chart.value) return
   instance = echarts.init(chart.value)
-  window.addEventListener('resize', () => instance?.resize())
+  window.addEventListener('resize', onResize)
+  updateChart()
 }
 
 function updateChart() {
   if (!instance || !store.result) return
-  const path = store.currentPath()
-  const data = path.map(p => [p.step, p.z])
+  // 数据只画到当前步（进度只往右推进），但坐标轴按整段路径的口径固定
+  const data = store.currentPath().map(p => [p.step, p.z])
+  const [zLo, zHi] = store.zRange
   instance.setOption({
     backgroundColor: 'transparent',
     grid: { left: 50, right: 20, top: 20, bottom: 40 },
-    xAxis: { type: 'value', name: '迭代步数', nameLocation: 'middle', nameGap: 25 },
-    yAxis: { type: 'value', name: 'f(x,y)', nameLocation: 'middle', nameGap: 40 },
+    xAxis: { type: 'value', name: '迭代步数', nameLocation: 'middle', nameGap: 25, min: 0, max: Math.max(1, store.maxStep) },
+    yAxis: { type: 'value', name: 'f(x,y)', nameLocation: 'middle', nameGap: 40, min: zLo, max: zHi },
     series: [{
       type: 'line', data, smooth: true, symbol: 'none',
       lineStyle: { color: '#667eea', width: 2 },
@@ -37,12 +40,15 @@ function updateChart() {
       ]) }
     }],
     animation: false
-  })
+  }, { notMerge: true })
 }
 
 onMounted(initChart)
 watch(() => [store.result, store.animationStep], updateChart, { deep: true })
-onUnmounted(() => { instance?.dispose(); instance = null })
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
+  instance?.dispose(); instance = null
+})
 </script>
 
 <style scoped>
