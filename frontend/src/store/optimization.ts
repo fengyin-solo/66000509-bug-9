@@ -44,10 +44,15 @@ export const useOptimizationStore = defineStore('optimization', () => {
   }
 
   function resetAnimation() { stopAnimation(); animationStep.value = 0 }
+  function clearResult() {
+    stopAnimation()
+    result.value = null
+    animationStep.value = 0
+  }
   function setStep(step: number) { animationStep.value = step }
 
   return {
     loading, result, animationStep, isPlaying, currentPath,
-    runOptimization, playAnimation, pauseAnimation, stopAnimation, resetAnimation, setStep
+    runOptimization, playAnimation, pauseAnimation, stopAnimation, resetAnimation, clearResult, setStep
   }
 })

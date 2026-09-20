@@ -61,6 +61,9 @@ const animStep = ref(0)
 const maxStep = computed(() => Math.max(0, (store.result?.path.length || 1) - 1))
 
 watch(() => store.animationStep, (v) => { animStep.value = v })
+watch(() => form.algorithm, () => {
+  store.clearResult()
+})
 
 function run() { store.runOptimization({ ...form } as any) }
 function onSlider(v: number) { store.setStep(v); store.pauseAnimation() }

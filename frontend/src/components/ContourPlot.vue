@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { useOptimizationStore } from '../store/optimization'
+import { getPathExtents, paddedRange } from '../utils/axis'
 const store = useOptimizationStore()
 const cvs = ref<HTMLCanvasElement>()
 
@@ -22,13 +23,14 @@ function draw() {
   const path = store.result?.path || []
   if (path.length === 0) return
 
-  // Find ranges
-  const xs = path.map(p => p.x), ys = path.map(p => p.y)
-  const xMin = Math.min(...xs), xMax = Math.max(...xs)
-  const yMin = Math.min(...ys), yMax = Math.max(...ys)
-  const padX = (xMax - xMin) * 0.2 || 1
-  const padY = (yMax - yMin) * 0.2 || 1
-  const rx = xMin - padX, ry = yMin - padY, rw = xMax - xMin + 2 * padX, rh = yMax - yMin + 2 * padY
+  // 坐标范围按整条路径固定，动画过程中只追加轨迹，不重新缩放。
+  const extents = getPathExtents(path)
+  const xRange = paddedRange(extents.x, 0.2)
+  const yRange = paddedRange(extents.y, 0.2)
+  const zRange = extents.z
+
+  const rx = xRange.min, ry = yRange.min
+  const rw = xRange.max - xRange.min, rh = yRange.max - yRange.min
 
   const tx = (v: number) => ((v - rx) / rw) * W
   const ty = (v: number) => H - ((v - ry) / rh) * H
@@ -41,10 +43,9 @@ function draw() {
   }
 
   // Draw heatmap-style fill based on z values
-  const zs = path.map(p => p.z); const zMin = Math.min(...zs), zMax = Math.max(...zs)
-  const zr = zMax - zMin || 1
+  const zr = zRange.max - zRange.min || 1
   for (const pt of path) {
-    const t = (pt.z - zMin) / zr
+    const t = (pt.z - zRange.min) / zr
     const px = tx(pt.x), py = ty(pt.y)
     // blend: red (high) → blue (low)
     const r = Math.round(255 * t), b = Math.round(255 * (1 - t)), g = Math.round(128 * (1 - Math.abs(t - 0.5) * 2))

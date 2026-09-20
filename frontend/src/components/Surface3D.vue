@@ -10,6 +10,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { useOptimizationStore } from '../store/optimization'
+import { getPathExtents } from '../utils/axis'
 
 const store = useOptimizationStore()
 const container = ref<HTMLDivElement>()
@@ -30,21 +31,21 @@ function initScene() {
 function buildSurface() {
   surfaceGroup.clear(); pathGroup.clear()
   const path = store.result?.path || []; if (!path.length) return
-  const xs = path.map(p => p.x), ys = path.map(p => p.y), zs = path.map(p => p.z)
-  const xMin = Math.min(...xs), xMax = Math.max(...xs), yMin = Math.min(...ys), yMax = Math.max(...ys)
-  const zMin = Math.min(...zs), zMax = Math.max(...zs)
-  const px = xMax - xMin || 1, py = yMax - yMin || 1, pz = zMax - zMin || 1
+  // 坐标范围按整条路径固定，保证与2D视图和收敛曲线使用同一口径。
+  const extents = getPathExtents(path)
+  const { x: xRange, y: yRange, z: rawZRange } = extents
+  const px = xRange.max - xRange.min || 1, py = yRange.max - yRange.min || 1, pzRaw = rawZRange.max - rawZRange.min || 1
   const scale = 3
-  const map = (x: number, y: number) => ((x - xMin) / px - 0.5) * scale
-  const mapy = (y: number) => ((y - yMin) / py - 0.5) * scale
-  const mapz = (z: number) => ((z - zMin) / pz) * 2
+  const map = (x: number) => ((x - xRange.min) / px - 0.5) * scale
+  const mapy = (y: number) => ((y - yRange.min) / py - 0.5) * scale
+  const mapz = (z: number) => ((z - rawZRange.min) / pzRaw) * 2
 
   // Surface points as scattered dots
   const geom = new THREE.BufferGeometry()
   const positions: number[] = [], colors: number[] = []
   for (const pt of path) {
-    positions.push(map(pt.x, pt.y), mapz(pt.z), mapy(pt.y))
-    const t = (pt.z - zMin) / pz
+    positions.push(map(pt.x), mapz(pt.z), mapy(pt.y))
+    const t = (pt.z - rawZRange.min) / pzRaw
     colors.push(t, 0.3 * (1 - t), 1 - t)
   }
   geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
@@ -57,7 +58,7 @@ function buildSurface() {
   if (animPath.length > 1) {
     const lineGeom = new THREE.BufferGeometry()
     const pts: number[] = []
-    for (const pt of animPath) pts.push(map(pt.x, pt.y), mapz(pt.z), mapy(pt.y))
+    for (const pt of animPath) pts.push(map(pt.x), mapz(pt.z), mapy(pt.y))
     lineGeom.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
     pathGroup.add(new THREE.Line(lineGeom, new THREE.LineBasicMaterial({ color: 0x00ffcc, linewidth: 1 })))
   }
@@ -68,9 +69,9 @@ function buildSurface() {
     s.position.set(x, z, y); pathGroup.add(s)
   }
   if (path.length) {
-    const first = path[0]; marker(map(first.x, first.y), mapy(first.y), mapz(first.z), 0x4fc3f7, 0.14)
-    const cur = animPath[animPath.length - 1]; marker(map(cur.x, cur.y), mapy(cur.y), mapz(cur.z), 0x66bb6a, 0.12)
-    const last = path[path.length - 1]; marker(map(last.x, last.y), mapy(last.y), mapz(last.z), 0xef5350, 0.14)
+    const first = path[0]; marker(map(first.x), mapy(first.y), mapz(first.z), 0x4fc3f7, 0.14)
+    const cur = animPath[animPath.length - 1]; marker(map(cur.x), mapy(cur.y), mapz(cur.z), 0x66bb6a, 0.12)
+    const last = path[path.length - 1]; marker(map(last.x), mapy(last.y), mapz(last.z), 0xef5350, 0.14)
   }
 }
 function animate() { animId = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera) }
